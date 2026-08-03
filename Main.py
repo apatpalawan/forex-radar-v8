@@ -118,7 +118,12 @@ def reset_debug():
 
 
 def debug_report():
-    if scan_debug["signal_found"] > 0:
+    # ใช้ candidate_signals (สัญญาณจริงที่ผ่านทุกด่านและถูกคิวไว้ส่ง)
+    # แทน scan_debug["signal_found"] เพราะค่านั้นนับทุกครั้งที่
+    # analyze_signal() คืนค่า dict กลับมา (แม้ trend จะเป็น SIDEWAY
+    # หรือ score จะไม่ผ่านเกณฑ์ก็ตาม) จึงทำให้ขึ้น "SIGNAL FOUND"
+    # ทั้งที่ไม่มีสัญญาณจริงถูกส่งออกไปเลย
+    if len(candidate_signals) > 0:
         result = "SIGNAL FOUND"
     else:
         result = "NO SIGNAL"
@@ -438,6 +443,18 @@ Score  : {score}
 """
         )
 
+        if trend not in (
+            "BUY",
+            "SELL"
+        ):
+            scan_debug["reject"]["sideway"] += 1
+            logging.info(
+                f"{symbol} REJECT SIDEWAY"
+            )
+            continue
+
+        scan_debug["trend_pass"] += 1
+
         minimum = (
             STOCK_MIN_SCORE
             if is_stock
@@ -452,18 +469,6 @@ Score  : {score}
             continue
 
         scan_debug["score_pass"] += 1
-
-        if trend not in (
-            "BUY",
-            "SELL"
-        ):
-            scan_debug["reject"]["sideway"] += 1
-            logging.info(
-                f"{symbol} REJECT SIDEWAY"
-            )
-            continue
-
-        scan_debug["trend_pass"] += 1
 
         best_dw = None
         primary_dw = {}
