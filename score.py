@@ -1,27 +1,40 @@
+# ==========================================================
+# SCORE ENGINE V9.1 PROFESSIONAL
+#
+# Compatible:
+# - Main.py V9.2
+# - Signal Engine V9.1
+# - Indicator V8.5+
+#
+# Concept:
+# Bot = Filter, Not Decision Maker
+#
+# Change:
+# - Soft EMA scoring
+# - No silent score failure
+# - Better DW signal filtering
+# ==========================================================
+
+
 import logging
 
 from price_action import detect_price_action
 from fibo import get_fibonacci
 
 
-# ==========================================================
-# SCORE ENGINE V9.2 DEBUG PROFESSIONAL
-#
-# Compatible:
-# Main.py V9.2
-# Signal Engine V9.1
-# Indicator.py V8.5
-#
-# Concept:
-# Debug First - No Hidden Failure
-# ==========================================================
 
+# ==========================================================
+# SAFE VALUE
+# ==========================================================
 
 def safe_get(row, key, default=0):
 
     try:
 
-        value = row.get(key, default)
+        value = row.get(
+            key,
+            default
+        )
 
         if value is None:
             return default
@@ -32,7 +45,6 @@ def safe_get(row, key, default=0):
         return float(value)
 
     except Exception:
-
         return default
 
 
@@ -71,88 +83,76 @@ def calculate_score(df, trend):
 
 
     score = 0
-
     reasons = []
 
-    score_detail = {}
-
-
 
     # ======================================================
-    # DATA DEBUG
+    # MARKET DATA
     # ======================================================
 
-    close = safe_get(last,"Close")
-    ema9 = safe_get(last,"EMA9")
-    ema21 = safe_get(last,"EMA21")
-    ema50 = safe_get(last,"EMA50")
+    close = safe_get(
+        last,
+        "Close"
+    )
 
-    adx = safe_get(last,"ADX")
-    rsi = safe_get(last,"RSI")
-    macd = safe_get(last,"MACD")
-    macd_signal = safe_get(last,"MACD_SIGNAL")
+    ema9 = safe_get(
+        last,
+        "EMA9"
+    )
 
-    volume = safe_get(last,"Volume")
-    volume_ma = safe_get(last,"VOL_MA20")
+    ema21 = safe_get(
+        last,
+        "EMA21"
+    )
 
-
-    logging.info(
-        f"""
-INDICATOR DEBUG
-
-Trend : {trend}
-
-Close : {close}
-
-EMA9  : {ema9}
-EMA21 : {ema21}
-EMA50 : {ema50}
-
-ADX   : {adx}
-RSI   : {rsi}
-
-MACD  : {macd}
-SIGNAL: {macd_signal}
-
-Volume    : {volume}
-VOL MA20  : {volume_ma}
-"""
+    ema50 = safe_get(
+        last,
+        "EMA50"
     )
 
 
-
     # ======================================================
-    # EMA ALIGNMENT (35)
+    # EMA TREND (35)
     # ======================================================
-
-    ema_score = 0
-
 
     if trend == "BUY":
 
-        if close > ema9 > ema21 > ema50:
+        if ema9 > ema21 > ema50:
 
-            ema_score = 35
+            score += 25
 
             reasons.append(
                 "EMA Bullish"
             )
 
 
+        if close > ema9:
+
+            score += 10
+
+            reasons.append(
+                "Price Above EMA9"
+            )
+
+
     elif trend == "SELL":
 
-        if close < ema9 < ema21 < ema50:
+        if ema9 < ema21 < ema50:
 
-            ema_score = 35
+            score += 25
 
             reasons.append(
                 "EMA Bearish"
             )
 
 
-    score += ema_score
+        if close < ema9:
 
-    score_detail["EMA"] = ema_score
+            score += 10
+
+            reasons.append(
+                "Price Below EMA9"
+            )
 
 
 
@@ -160,12 +160,15 @@ VOL MA20  : {volume_ma}
     # ADX TREND POWER (20)
     # ======================================================
 
-    adx_score = 0
+    adx = safe_get(
+        last,
+        "ADX"
+    )
 
 
     if adx >= 30:
 
-        adx_score = 20
+        score += 20
 
         reasons.append(
             "ADX Strong"
@@ -174,7 +177,7 @@ VOL MA20  : {volume_ma}
 
     elif adx >= 25:
 
-        adx_score = 15
+        score += 15
 
         reasons.append(
             "ADX Trend"
@@ -183,12 +186,11 @@ VOL MA20  : {volume_ma}
 
     elif adx >= 20:
 
-        adx_score = 10
+        score += 10
 
-
-    score += adx_score
-
-    score_detail["ADX"] = adx_score
+        reasons.append(
+            "ADX Weak Trend"
+        )
 
 
 
@@ -196,14 +198,17 @@ VOL MA20  : {volume_ma}
     # RSI MOMENTUM (15)
     # ======================================================
 
-    rsi_score = 0
+    rsi = safe_get(
+        last,
+        "RSI"
+    )
 
 
     if trend == "BUY":
 
         if rsi >= 60:
 
-            rsi_score = 15
+            score += 15
 
             reasons.append(
                 "RSI Bull"
@@ -212,15 +217,18 @@ VOL MA20  : {volume_ma}
 
         elif rsi >= 50:
 
-            rsi_score = 10
+            score += 10
 
+            reasons.append(
+                "RSI Positive"
+            )
 
 
     elif trend == "SELL":
 
         if rsi <= 40:
 
-            rsi_score = 15
+            score += 15
 
             reasons.append(
                 "RSI Bear"
@@ -229,28 +237,34 @@ VOL MA20  : {volume_ma}
 
         elif rsi <= 50:
 
-            rsi_score = 10
+            score += 10
 
-
-
-    score += rsi_score
-
-    score_detail["RSI"] = rsi_score
+            reasons.append(
+                "RSI Negative"
+            )
 
 
 
     # ======================================================
-    # MACD (10)
+    # MACD CONFIRMATION (10)
     # ======================================================
 
-    macd_score = 0
+    macd = safe_get(
+        last,
+        "MACD"
+    )
+
+    macd_signal = safe_get(
+        last,
+        "MACD_SIGNAL"
+    )
 
 
     if trend == "BUY":
 
         if macd > macd_signal:
 
-            macd_score = 10
+            score += 10
 
             reasons.append(
                 "MACD Bull"
@@ -261,16 +275,11 @@ VOL MA20  : {volume_ma}
 
         if macd < macd_signal:
 
-            macd_score = 10
+            score += 10
 
             reasons.append(
                 "MACD Bear"
             )
-
-
-    score += macd_score
-
-    score_detail["MACD"] = macd_score
 
 
 
@@ -278,12 +287,11 @@ VOL MA20  : {volume_ma}
     # PRICE ACTION (10)
     # ======================================================
 
-    pa_score = 0
-
-
     try:
 
-        pa = detect_price_action(df)
+        pa = detect_price_action(
+            df
+        )
 
     except Exception:
 
@@ -291,43 +299,40 @@ VOL MA20  : {volume_ma}
 
 
 
-    if trend == "BUY":
+    if isinstance(pa, dict):
 
-        if (
-            pa.get("bullish_engulfing")
-            or
-            pa.get("hammer")
-            or
-            pa.get("breakout") == "BUY"
-        ):
+        if trend == "BUY":
 
-            pa_score = 10
+            if (
+                pa.get("bullish_engulfing")
+                or
+                pa.get("hammer")
+                or
+                pa.get("breakout") == "BUY"
+            ):
 
-            reasons.append(
-                "Price Action"
-            )
+                score += 10
 
-
-    elif trend == "SELL":
-
-        if (
-            pa.get("bearish_engulfing")
-            or
-            pa.get("shooting_star")
-            or
-            pa.get("breakout") == "SELL"
-        ):
-
-            pa_score = 10
-
-            reasons.append(
-                "Price Action"
-            )
+                reasons.append(
+                    "Price Action"
+                )
 
 
-    score += pa_score
+        elif trend == "SELL":
 
-    score_detail["PRICE"] = pa_score
+            if (
+                pa.get("bearish_engulfing")
+                or
+                pa.get("shooting_star")
+                or
+                pa.get("breakout") == "SELL"
+            ):
+
+                score += 10
+
+                reasons.append(
+                    "Price Action"
+                )
 
 
 
@@ -335,32 +340,32 @@ VOL MA20  : {volume_ma}
     # VOLUME (10)
     # ======================================================
 
-    volume_score = 0
+    volume = safe_get(
+        last,
+        "Volume"
+    )
+
+    volume_ma = safe_get(
+        last,
+        "VOL_MA20"
+    )
 
 
     if volume_ma > 0:
 
         if volume > volume_ma:
 
-            volume_score = 10
+            score += 10
 
             reasons.append(
                 "Volume Spike"
             )
 
 
-    score += volume_score
-
-    score_detail["VOLUME"] = volume_score
-
-
 
     # ======================================================
     # FIBONACCI (5)
     # ======================================================
-
-    fibo_score = 0
-
 
     try:
 
@@ -369,10 +374,9 @@ VOL MA20  : {volume_ma}
             trend
         )
 
-
         if fibo:
 
-            fibo_score = 5
+            score += 5
 
             reasons.append(
                 "Fibonacci"
@@ -382,11 +386,6 @@ VOL MA20  : {volume_ma}
     except Exception:
 
         pass
-
-
-    score += fibo_score
-
-    score_detail["FIBO"] = fibo_score
 
 
 
@@ -402,27 +401,38 @@ VOL MA20  : {volume_ma}
 
     logging.info(
         f"""
-========== SCORE DEBUG ==========
+[SCORE DEBUG]
 
-Trend : {trend}
+Trend :
+{trend}
 
-Score : {score}/100
+Close :
+{close}
 
-DETAIL
+EMA9 :
+{ema9}
 
-EMA    : {score_detail['EMA']}
-ADX    : {score_detail['ADX']}
-RSI    : {score_detail['RSI']}
-MACD   : {score_detail['MACD']}
-PRICE  : {score_detail['PRICE']}
-VOLUME : {score_detail['VOLUME']}
-FIBO   : {score_detail['FIBO']}
+EMA21 :
+{ema21}
 
-REASON
+EMA50 :
+{ema50}
 
+ADX :
+{adx}
+
+RSI :
+{rsi}
+
+MACD :
+{macd}
+
+FINAL SCORE :
+{score}
+
+Reason :
 {', '.join(reasons)}
 
-=================================
 """
     )
 
