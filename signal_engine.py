@@ -1,21 +1,21 @@
+# ==========================================================
+# SIGNAL ENGINE V9.1 (DEBUG VERSION)
+#
+# Compatible:
+# - Main.py V9.1
+# - Score Engine
+# - DW Scanner V9.1
+#
+# Concept:
+# Signal Engine = Evaluator
+# Debug only - Logic preserved
+# ==========================================================
+
+
 from score import calculate_score
 from fibo import get_fibonacci
 from price_action import detect_price_action
 
-
-# ==========================================================
-# Signal Engine V9.1 DEBUG PROFESSIONAL
-#
-# Compatible:
-# - Main.py V9.1
-# - Indicator V8.5
-# - Score Engine
-# - DW Scanner
-#
-# Concept:
-# Signal Engine = Evaluator
-# Debug first before production tuning
-# ==========================================================
 
 
 def analyze_signal(symbol, df):
@@ -31,6 +31,10 @@ def analyze_signal(symbol, df):
         return None
 
 
+
+    # ======================================================
+    # REQUIRED COLUMN CHECK
+    # ======================================================
 
     required = [
 
@@ -48,8 +52,10 @@ def analyze_signal(symbol, df):
 
             print(
                 symbol,
-                "MISSING COLUMN",
-                col
+                "MISSING COLUMN:",
+                col,
+                "AVAILABLE:",
+                list(df.columns)
             )
 
             return None
@@ -61,42 +67,25 @@ def analyze_signal(symbol, df):
 
 
     # ======================================================
-    # DEBUG MARKET DATA
+    # EMA DEBUG
     # ======================================================
 
     print(
-        "\n========== SIGNAL DEBUG =========="
-    )
 
-    print(
-        "SYMBOL:",
-        symbol
-    )
+        symbol,
 
-    print(
-        "PRICE:",
-        round(float(last["Close"]),4)
-    )
+        "CLOSE:",
+        round(float(last["Close"]),2),
 
+        "EMA9:",
+        round(float(last["EMA9"]),2),
 
-    print(
-        "EMA:",
-        {
-            "EMA9": round(float(last["EMA9"]),4),
-            "EMA21": round(float(last["EMA21"]),4),
-            "EMA50": round(float(last["EMA50"]),4)
-        }
-    )
+        "EMA21:",
+        round(float(last["EMA21"]),2),
 
+        "EMA50:",
+        round(float(last["EMA50"]),2)
 
-    print(
-        "INDICATORS:",
-        {
-            "ADX": round(float(last.get("ADX",0)),2),
-            "RSI": round(float(last.get("RSI",0)),2),
-            "MACD": round(float(last.get("MACD",0)),4),
-            "MACD_SIGNAL": round(float(last.get("MACD_SIGNAL",0)),4)
-        }
     )
 
 
@@ -104,7 +93,6 @@ def analyze_signal(symbol, df):
     # ======================================================
     # EMA TREND FILTER
     # ======================================================
-
 
     if (
 
@@ -149,8 +137,13 @@ def analyze_signal(symbol, df):
 
 
     print(
-        "TREND:",
+
+        symbol,
+
+        "TREND RESULT:",
+
         trend
+
     )
 
 
@@ -158,7 +151,6 @@ def analyze_signal(symbol, df):
     # ======================================================
     # SCORE ENGINE
     # ======================================================
-
 
     score = calculate_score(
 
@@ -170,117 +162,35 @@ def analyze_signal(symbol, df):
 
 
     print(
+
+        symbol,
+
         "SCORE:",
+
         score
+
     )
 
 
 
     # ======================================================
-    # SIDEWAY
+    # PRICE ACTION / FIBO
     # ======================================================
 
+    price_action = detect_price_action(
 
-    if trend == "SIDEWAY":
+        df
 
-        print(
-            symbol,
-            "REJECT : SIDEWAY"
-        )
-
-        return None
+    )
 
 
+    fibo = get_fibonacci(
 
-    # ======================================================
-    # SCORE FILTER
-    # ======================================================
+        df,
 
+        trend
 
-    if score < 60:
-
-        print(
-            symbol,
-            "REJECT : SCORE LOW",
-            score
-        )
-
-        return None
-
-
-
-
-    # ======================================================
-    # PRICE ACTION
-    # ======================================================
-
-
-    try:
-
-        price_action = detect_price_action(
-            df
-        )
-
-    except Exception:
-
-        price_action = {}
-
-
-
-
-    # ======================================================
-    # FIBONACCI
-    # ======================================================
-
-
-    try:
-
-        fibo = get_fibonacci(
-            df,
-            trend
-        )
-
-    except Exception:
-
-        fibo = None
-
-
-
-
-    # ======================================================
-    # GRADE
-    # ======================================================
-
-
-    if score >= 90:
-
-        grade = "A+"
-        confidence = "VERY HIGH"
-
-
-    elif score >= 80:
-
-        grade = "A"
-        confidence = "HIGH"
-
-
-    elif score >= 70:
-
-        grade = "B"
-        confidence = "GOOD"
-
-
-    elif score >= 60:
-
-        grade = "C"
-        confidence = "MEDIUM"
-
-
-    else:
-
-        grade = "D"
-        confidence = "LOW"
-
+    )
 
 
 
@@ -288,16 +198,13 @@ def analyze_signal(symbol, df):
     # RECOMMENDATION
     # ======================================================
 
-
     if trend == "BUY":
 
         recommendation = "CALL"
 
-
     elif trend == "SELL":
 
         recommendation = "PUT"
-
 
     else:
 
@@ -305,24 +212,25 @@ def analyze_signal(symbol, df):
 
 
 
-
     # ======================================================
     # REASONS
     # ======================================================
 
-
     reasons = []
 
 
-    if last.get(
-        "ADX",
-        0
-    ) >= 25:
+    if trend == "SIDEWAY":
+
+        reasons.append(
+            "SIDEWAY"
+        )
+
+
+    if last.get("ADX",0) >= 25:
 
         reasons.append(
             "Strong Trend"
         )
-
 
 
     if (
@@ -331,17 +239,11 @@ def analyze_signal(symbol, df):
 
         and
 
-        last.get(
-            "MACD",
-            0
-        )
+        last.get("MACD",0)
 
         >
 
-        last.get(
-            "MACD_SIGNAL",
-            0
-        )
+        last.get("MACD_SIGNAL",0)
 
     ):
 
@@ -350,24 +252,17 @@ def analyze_signal(symbol, df):
         )
 
 
-
     elif (
 
         trend == "SELL"
 
         and
 
-        last.get(
-            "MACD",
-            0
-        )
+        last.get("MACD",0)
 
         <
 
-        last.get(
-            "MACD_SIGNAL",
-            0
-        )
+        last.get("MACD_SIGNAL",0)
 
     ):
 
@@ -385,11 +280,9 @@ def analyze_signal(symbol, df):
 
 
 
-
     # ======================================================
     # VOLUME
     # ======================================================
-
 
     try:
 
@@ -403,36 +296,15 @@ def analyze_signal(symbol, df):
 
         )
 
-
     except:
 
         volume_spike = False
 
 
 
-
-    print(
-        "PASS SIGNAL",
-        {
-            "trend":trend,
-            "score":score,
-            "grade":grade,
-            "reasons":reasons
-        }
-    )
-
-
-    print(
-        "=================================\n"
-    )
-
-
-
-
     # ======================================================
     # RETURN
     # ======================================================
-
 
     return {
 
@@ -449,12 +321,6 @@ def analyze_signal(symbol, df):
         "score": score,
 
 
-        "grade": grade,
-
-
-        "confidence": confidence,
-
-
         "price_action": price_action,
 
 
@@ -464,7 +330,9 @@ def analyze_signal(symbol, df):
         "volume_spike": volume_spike,
 
 
-        "reasons": reasons
+        "trade_ready": score >= 65,
 
+
+        "reasons": reasons
 
     }
