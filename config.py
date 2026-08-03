@@ -1,14 +1,11 @@
 # ==========================================
-# FOREX RADAR V9 PROFESSIONAL
+# FOREX RADAR V8.6 PROFESSIONAL
 # CONFIGURATION
 # ==========================================
 
 
-# ==========================================
-# VERSION
-# ==========================================
-
-VERSION = "9.0"
+# Version
+VERSION = "8.6"
 
 
 
@@ -25,12 +22,14 @@ SCAN_INTERVAL = 60
 # ==========================================
 
 SEND_TIMES = [
+
     "09:10",
     "10:30",
     "12:00",
     "14:00",
     "15:30",
     "16:45"
+
 ]
 
 
@@ -40,6 +39,7 @@ SEND_TIMES = [
 # ==========================================
 
 STOCKS = [
+
     "ADVANC",
     "AOT",
     "KBANK",
@@ -51,6 +51,7 @@ STOCKS = [
     "DELTA",
     "GULF",
     "CPN"
+
 ]
 
 
@@ -60,10 +61,12 @@ STOCKS = [
 # ==========================================
 
 FOREX = [
+
     "XAUUSD",
     "EURUSD",
     "GBPUSD",
     "USDJPY"
+
 ]
 
 
@@ -74,15 +77,33 @@ FOREX = [
 
 TICKER_MAP = {
 
-    "^SET50": "TDEX.BK",
 
-    "XAUUSD": "GC=F",
+    # SET50 (ใช้ TDEX.BK ETF แทน ^SET50.BK ดิบ - ดูเหตุผลใน data_loader.py)
 
-    "EURUSD": "EURUSD=X",
+    "^SET50":
+    "TDEX.BK",
 
-    "GBPUSD": "GBPUSD=X",
 
-    "USDJPY": "JPY=X"
+
+    # GOLD
+
+    "XAUUSD":
+    "GC=F",
+
+
+
+    # FOREX
+
+    "EURUSD":
+    "EURUSD=X",
+
+
+    "GBPUSD":
+    "GBPUSD=X",
+
+
+    "USDJPY":
+    "JPY=X"
 
 }
 
@@ -90,33 +111,26 @@ TICKER_MAP = {
 
 # ==========================================
 # DW SETTINGS
-#
-# DW = FILTER ONLY
-#
-# ไม่ให้คะแนน
-# ไม่เลือกตัวชนะ
-# ไม่ใช้ Hybrid Score
-#
 # ==========================================
 
-
+# ==========================================
+# DW API SETTINGS
+# ==========================================
+# ใช้ API ของผู้ออก DW แทน SET
 USE_SET_DW_API = False
-
-
+# โหลดข้อมูลจากผู้ออก DW พร้อมกัน
 DW_API_TIMEOUT = 15
-
+# หน่วงเวลาระหว่างเรียก API (วินาที)
 DW_API_DELAY = 0.2
-
+# จำนวน Thread สำหรับโหลดข้อมูล
 DW_MAX_WORKERS = 8
-
-
+# เปิด Debug
 DW_DEBUG = True
 
 
-
-# ==========================================
-# DW ISSUER FILTER
-# ==========================================
+# เลือกเฉพาะผู้ออก DW
+# BLS = บัวหลวง
+# YUANTA = หยวนต้า
 
 ALLOWED_DW_ISSUERS = [
 
@@ -127,9 +141,7 @@ ALLOWED_DW_ISSUERS = [
 
 
 
-# ==========================================
-# DW QUALITY FILTER
-# ==========================================
+# Minimum DW Quality Filter
 
 MIN_SENSITIVITY = 1.0
 
@@ -141,30 +153,17 @@ MAX_SPREAD = 0.02
 
 MIN_DAYS_LEFT = 30
 
-
-
-# ==========================================
-# LEGACY SCORE
-#
-# V9 ไม่ใช้ DW Score แล้ว
-# เก็บไว้ป้องกัน Module เก่า Error
-# ==========================================
-
-MIN_DW_SCORE = None
+MIN_DW_SCORE = 75
 
 
 
-# ==========================================
-# FALLBACK FILTER
-# ==========================================
+# Fallback Filter
 
 DW_FALLBACK_SENSITIVITY = 0.95
 
 
 
-# ==========================================
-# ISSUER PRIORITY
-# ==========================================
+# Issuer Priority Weight
 
 PREFERRED_ISSUER_WEIGHT = {
 
@@ -189,7 +188,7 @@ MAX_ALERT_MEMORY = 200
 
 
 # ==========================================
-# MARKET DATA SETTINGS
+# DATA SETTINGS
 # ==========================================
 
 TIMEFRAME = "1d"
@@ -218,11 +217,16 @@ MARKET_CLOSE_MINUTE = 0
 
 RISK_SETTINGS = {
 
-    "MAX_POSITION": 0.05,
+    "MAX_POSITION":
+    0.05,
 
-    "STOP_LOSS_PERCENT": 3,
 
-    "TAKE_PROFIT_PERCENT": 6
+    "STOP_LOSS_PERCENT":
+    3,
+
+
+    "TAKE_PROFIT_PERCENT":
+    6
 
 }
 
@@ -234,9 +238,13 @@ RISK_SETTINGS = {
 
 SYMBOL_ALIAS = {
 
-    "^SET50.BK": "SET50",
 
-    "^SET50": "SET50"
+    "^SET50.BK":
+    "SET50",
+
+
+    "^SET50":
+    "SET50"
 
 }
 
