@@ -1,150 +1,107 @@
 # ==========================================
-
 # FOREX RADAR V9 PROFESSIONAL
-
 # CONFIGURATION
-
 # ==========================================
 
-# ==========================================
 
+# ==========================================
 # VERSION
-
 # ==========================================
 
 VERSION = "9.0"
 
+
+
 # ==========================================
-
 # SCAN SETTINGS
-
 # ==========================================
 
 SCAN_INTERVAL = 60
 
+
+
 # ==========================================
-
 # LINE NOTIFY SEND TIME
-
 # ==========================================
 
 SEND_TIMES = [
-
-```
-"09:10",
-"10:30",
-"12:00",
-"14:00",
-"15:30",
-"16:45"
-```
-
+    "09:10",
+    "10:30",
+    "12:00",
+    "14:00",
+    "15:30",
+    "16:45"
 ]
 
+
+
 # ==========================================
-
 # THAI STOCK LIST
-
 # ==========================================
 
 STOCKS = [
-
-```
-"ADVANC",
-"AOT",
-"KBANK",
-"SCB",
-"BBL",
-"PTT",
-"PTTEP",
-"CPALL",
-"DELTA",
-"GULF",
-"CPN"
-```
-
+    "ADVANC",
+    "AOT",
+    "KBANK",
+    "SCB",
+    "BBL",
+    "PTT",
+    "PTTEP",
+    "CPALL",
+    "DELTA",
+    "GULF",
+    "CPN"
 ]
 
+
+
 # ==========================================
-
 # FOREX LIST
-
 # ==========================================
 
 FOREX = [
-
-```
-"XAUUSD",
-"EURUSD",
-"GBPUSD",
-"USDJPY"
-```
-
+    "XAUUSD",
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY"
 ]
 
+
+
 # ==========================================
-
 # YAHOO FINANCE TICKER MAP
-
 # ==========================================
 
 TICKER_MAP = {
 
-```
-# SET50
-# ใช้ ETF แทนดึง Index ตรง
+    "^SET50": "TDEX.BK",
 
-"^SET50":
-"TDEX.BK",
+    "XAUUSD": "GC=F",
 
+    "EURUSD": "EURUSD=X",
 
+    "GBPUSD": "GBPUSD=X",
 
-# GOLD
-
-"XAUUSD":
-"GC=F",
-
-
-
-# FOREX
-
-"EURUSD":
-"EURUSD=X",
-
-
-"GBPUSD":
-"GBPUSD=X",
-
-
-"USDJPY":
-"JPY=X"
-```
+    "USDJPY": "JPY=X"
 
 }
 
-# ==========================================
 
+
+# ==========================================
 # DW SETTINGS
-
 #
-
-# Concept:
-
-# DW = Filter Only
-
+# DW = FILTER ONLY
+#
 # ไม่ให้คะแนน
-
 # ไม่เลือกตัวชนะ
-
 # ไม่ใช้ Hybrid Score
-
+#
 # ==========================================
 
-# ใช้ API ผู้ออก DW
 
 USE_SET_DW_API = False
 
-# API Settings
 
 DW_API_TIMEOUT = 15
 
@@ -152,29 +109,26 @@ DW_API_DELAY = 0.2
 
 DW_MAX_WORKERS = 8
 
-# Debug
 
 DW_DEBUG = True
 
+
+
 # ==========================================
-
-# ALLOWED DW ISSUER
-
+# DW ISSUER FILTER
 # ==========================================
 
 ALLOWED_DW_ISSUERS = [
 
-```
-"BLS",
-"YUANTA"
-```
+    "BLS",
+    "YUANTA"
 
 ]
 
+
+
 # ==========================================
-
 # DW QUALITY FILTER
-
 # ==========================================
 
 MIN_SENSITIVITY = 1.0
@@ -187,50 +141,43 @@ MAX_SPREAD = 0.02
 
 MIN_DAYS_LEFT = 30
 
+
+
 # ==========================================
-
 # LEGACY SCORE
-
 #
-
-# Deprecated
-
 # V9 ไม่ใช้ DW Score แล้ว
-
-# เก็บไว้เพื่อป้องกัน Module เก่า Error
-
+# เก็บไว้ป้องกัน Module เก่า Error
 # ==========================================
 
 MIN_DW_SCORE = None
 
+
+
 # ==========================================
-
 # FALLBACK FILTER
-
 # ==========================================
 
 DW_FALLBACK_SENSITIVITY = 0.95
 
+
+
 # ==========================================
-
 # ISSUER PRIORITY
-
 # ==========================================
 
 PREFERRED_ISSUER_WEIGHT = {
 
-```
-"BLS": 5,
+    "BLS": 5,
 
-"YUANTA": 5
-```
+    "YUANTA": 5
 
 }
 
+
+
 # ==========================================
-
 # CACHE SETTINGS
-
 # ==========================================
 
 PRICE_CACHE_TTL = 300
@@ -239,20 +186,20 @@ DW_CACHE_TTL = 900
 
 MAX_ALERT_MEMORY = 200
 
+
+
 # ==========================================
-
 # MARKET DATA SETTINGS
-
 # ==========================================
 
 TIMEFRAME = "1d"
 
 LOOKBACK = 700
 
+
+
 # ==========================================
-
 # THAI MARKET TIME
-
 # ==========================================
 
 MARKET_OPEN_HOUR = 9
@@ -263,97 +210,66 @@ MARKET_CLOSE_HOUR = 17
 
 MARKET_CLOSE_MINUTE = 0
 
+
+
 # ==========================================
-
 # RISK MANAGEMENT
-
 # ==========================================
 
 RISK_SETTINGS = {
 
-```
-"MAX_POSITION":
-0.05,
+    "MAX_POSITION": 0.05,
 
+    "STOP_LOSS_PERCENT": 3,
 
-"STOP_LOSS_PERCENT":
-3,
-
-
-"TAKE_PROFIT_PERCENT":
-6
-```
+    "TAKE_PROFIT_PERCENT": 6
 
 }
 
+
+
 # ==========================================
-
 # SYMBOL NORMALIZE
-
 # ==========================================
 
 SYMBOL_ALIAS = {
 
-```
-"^SET50.BK":
-"SET50",
+    "^SET50.BK": "SET50",
 
-
-"^SET50":
-"SET50"
-```
+    "^SET50": "SET50"
 
 }
 
+
+
 # ==========================================
-
 # DW ISSUER API
-
 # ==========================================
 
 DW_ISSUER_API = {
 
-```
-"BLS": {
+    "BLS": {
+        "enabled": True
+    },
 
-    "enabled": True
+    "YUANTA": {
+        "enabled": True
+    },
 
-},
+    "KGI": {
+        "enabled": False
+    },
 
+    "MACQ": {
+        "enabled": False
+    },
 
-"YUANTA": {
+    "CGSI": {
+        "enabled": False
+    },
 
-    "enabled": True
-
-},
-
-
-"KGI": {
-
-    "enabled": False
-
-},
-
-
-"MACQ": {
-
-    "enabled": False
-
-},
-
-
-"CGSI": {
-
-    "enabled": False
-
-},
-
-
-"JPM": {
-
-    "enabled": False
-
-}
-```
+    "JPM": {
+        "enabled": False
+    }
 
 }
