@@ -48,14 +48,12 @@ from dw_scanner import get_best_dw
 # CONFIG
 # ==========================================================
 
-# เกณฑ์นี้เป็นของ Signal Engine เดิม (หุ้น/forex BUY-SELL)
-# ไม่เกี่ยวกับ DW - อันนี้ยังใช้ระบบเดิมที่ทำงานดีอยู่แล้ว
 STOCK_MIN_SCORE = 70
 FOREX_MIN_SCORE = 70
 
-DW_SCAN_DELAY = 1.0  # ป้องกัน Rate Limit จาก BLS API (429/403)
+DW_SCAN_DELAY = 1.0  
 DW_CACHE_TIME = 900
-COOLDOWN_TIME = 1800  # Cooldown ห้ามแจ้งเตือนซ้ำภายใน 30 นาที (1800 วินาที)
+COOLDOWN_TIME = 1800  
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,12 +67,68 @@ logging.basicConfig(
 
 price_cache = {}
 dw_cache = {}
-last_alerts = {}     # เก็บเวลาแจ้งเตือนล่าสุดของแต่ละ Symbol เพื่อทำ Cooldown
+last_alerts = {}     
 
 signal_queue = []
 candidate_signals = []
 
 last_send_time = None
+
+
+# ==========================================================
+# DEBUG SCAN REPORT
+# V9.1
+# ==========================================================
+
+scan_debug = {
+    "scan_count": 0,
+    "data_pass": 0,
+    "signal_found": 0,
+    "score_pass": 0,
+    "trend_pass": 0,
+    "dw_pass": 0,
+    "dw_fail": 0,
+    "symbols": []
+}
+
+
+def reset_debug():
+    global scan_debug
+    scan_debug = {
+        "scan_count": 0,
+        "data_pass": 0,
+        "signal_found": 0,
+        "score_pass": 0,
+        "trend_pass": 0,
+        "dw_pass": 0,
+        "dw_fail": 0,
+        "symbols": []
+    }
+
+
+def debug_report():
+    return f"""
+📊 Forex Radar V{VERSION}
+
+SCAN REPORT
+
+Symbol Scan: {scan_debug['scan_count']}
+
+Data OK: {scan_debug['data_pass']}
+
+Signal Found: {scan_debug['signal_found']}
+
+Score Pass: {scan_debug['score_pass']}
+
+Trend Pass: {scan_debug['trend_pass']}
+
+DW Pass: {scan_debug['dw_pass']}
+
+DW Fail: {scan_debug['dw_fail']}
+
+Result:
+NO SIGNAL
+"""
 
 
 # ==========================================================
@@ -98,20 +152,17 @@ def is_send_time():
 def thai_market_open():
     now = thai_now()
 
-    # ตรวจสอบวันหยุดเสาร์ - อาทิตย์
     if now.weekday() >= 5:
         return False
 
     t = now.time()
 
-    # รอบเช้า: 09:55 - 12:30
     morning = (
         t >= datetime.strptime("09:55", "%H:%M").time()
         and
         t <= datetime.strptime("12:30", "%H:%M").time()
     )
 
-    # รอบบ่าย: 14:25 - 16:40
     afternoon = (
         t >= datetime.strptime("14:25", "%H:%M").time()
         and
@@ -123,8 +174,6 @@ def thai_market_open():
 
 # ==========================================================
 # RISK SYSTEM
-# (ใช้ค่า DW จริง เช่น sensitivity/delta/gearing มาจัดหมวด
-#  ไม่ใช่การให้คะแนน/ตัดสินใจแทนผู้ใช้)
 # ==========================================================
 
 def get_risk_level(
@@ -198,18 +247,14 @@ def send_queue():
             )
         else:
             logging.error(
-                "LINE SEND FAILED (ดูรายละเอียดจาก log ของ line_notify.py ด้านบน)"
+                "LINE SEND FAILED"
             )
 
         signal_queue.clear()
 
     else:
         ok = send_line(
-            f"""
-📊 Forex Radar V{VERSION}
-
-❌ ไม่พบสัญญาณที่ผ่านเงื่อนไข
-"""
+            debug_report()
         )
 
     last_send_time = (
@@ -225,15 +270,9 @@ def send_queue():
 # ==========================================================
 
 def run_scan_cycle(force_send=False):
-    """
-    สแกน 1 รอบเต็ม (หุ้น/ทอง/forex/DW) แล้วส่ง LINE ถ้าถึงเวลาส่งจริง
-    หรือถ้า force_send=True (ใช้ตอนรันครั้งเดียวจบผ่าน GitHub Actions -
-    ตัวจับเวลาข้างนอกเป็นคนคุมเวลาแทน ไม่ต้องเช็ค is_send_time() ซ้ำ)
-
-    คืนค่า True เฉพาะเมื่อส่ง LINE ออกไปสำเร็จจริง (ไม่ใช่แค่ "ถึงเวลาส่ง"
-    หรือ "พยายามส่ง") - ถ้าไม่มี Token/ส่งไม่สำเร็จ/ไม่ถึงเวลาส่ง จะได้ False
-    """
     global last_send_time
+
+    reset_debug()
 
     now_time = thai_now().strftime("%H:%M")
     current_timestamp = time.time()
@@ -248,7 +287,6 @@ def run_scan_cycle(force_send=False):
         )
     )
 
-    # SET50 Symbol Mapping Dictionary
     set50_mapping = {
         "SET50": "SET50",
         "S50": "SET50",
@@ -256,14 +294,8 @@ def run_scan_cycle(force_send=False):
         "^SET50": "SET50"
     }
 
-    # หมายเหตุ: if True / if True ด้านล่างเป็นแค่ตัวคงระดับ indentation เดิม
-    # (ของเดิมอยู่ใน while True: / try: 2 ชั้น) ไม่ได้มีผลต่อ logic ใด ๆ
     if True:
         if True:
-            # ==================================================
-            # SET50 TREND
-            # ==================================================
-
             set50_df = get_data(
                 "^SET50",
                 True,
@@ -283,10 +315,6 @@ def run_scan_cycle(force_send=False):
                 f"THAI MARKET OPEN = {thai_market_open()}"
             )
 
-            # ==================================================
-            # SCAN SYMBOL
-            # ==================================================
-
             for symbol in (
                 ["^SET50"]
                 +
@@ -294,6 +322,10 @@ def run_scan_cycle(force_send=False):
                 +
                 FOREX
             ):
+                scan_debug["scan_count"] += 1
+                scan_debug["symbols"].append(
+                    symbol
+                )
 
                 is_stock = (
                     symbol in STOCKS
@@ -308,10 +340,6 @@ def run_scan_cycle(force_send=False):
                 ):
                     continue
 
-                # ==================================================
-                # LOAD DATA
-                # ==================================================
-
                 if symbol == "^SET50":
                     df = set50_df
                 else:
@@ -323,10 +351,7 @@ def run_scan_cycle(force_send=False):
 
                 if df is None:
                     continue
-
-                # ==================================================
-                # ANALYZE SIGNAL
-                # ==================================================
+                scan_debug["data_pass"] += 1
 
                 signal = analyze_signal(
                     symbol,
@@ -335,6 +360,7 @@ def run_scan_cycle(force_send=False):
 
                 if signal is None:
                     continue
+                scan_debug["signal_found"] += 1
 
                 score = signal.get(
                     "score",
@@ -349,28 +375,26 @@ def run_scan_cycle(force_send=False):
 
                 if score < minimum:
                     continue
+                scan_debug["score_pass"] += 1
 
                 trend = signal.get(
                     "trend",
                     "SIDEWAY"
                 )
 
-                # กรองไม่ให้เทรนด์ SIDEWAY เข้ากระบวนการหา DW หรือส่งสัญญาณ
                 if trend not in (
                     "BUY",
                     "SELL"
                 ):
                     continue
+                scan_debug["trend_pass"] += 1
 
                 best_dw = None
+                primary_dw = {}
 
                 risk = "NORMAL"
                 target = "Standard"
                 hold = "Intraday"
-
-                # ==================================================
-                # DW FILTER PIPELINE (ไม่มี Score - กรองผ่าน/ไม่ผ่านเท่านั้น)
-                # ==================================================
 
                 if is_stock:
 
@@ -380,18 +404,12 @@ def run_scan_cycle(force_send=False):
                         else symbol.replace(".BK", "")
                     )
 
-                    # Mapping SET50 variants safely
                     dw_symbol = set50_mapping.get(raw_dw_symbol, raw_dw_symbol)
 
-                    # แยก Cache Key ตาม Trend และประเภท DW (CALL/PUT) ป้องกันการสลับกัน
                     dw_type_suffix = "CALL" if trend == "BUY" else "PUT"
                     cache_key = f"{dw_symbol}_{trend}_{dw_type_suffix}"
 
                     dw_list = None
-
-                    # --------------------------
-                    # CACHE
-                    # --------------------------
 
                     if cache_key in dw_cache:
                         cache_age = (
@@ -404,10 +422,6 @@ def run_scan_cycle(force_send=False):
                             dw_list = (
                                 dw_cache[cache_key][1]
                             )
-
-                    # --------------------------
-                    # LOAD DW
-                    # --------------------------
 
                     if dw_list is None:
                         dw_list = get_best_dw(
@@ -428,16 +442,14 @@ def run_scan_cycle(force_send=False):
                         )
 
                     if not dw_list:
+                        scan_debug["dw_fail"] += 1
                         logging.info(
                             f"{symbol} NO DW PASS FILTER"
                         )
                         continue
+                    scan_debug["dw_pass"] += 1
 
-                    # ส่งทุกตัวที่ผ่าน Filter สูงสุด 3 ตัวแรก
-                    # (Scanner Sort ตามคุณภาพจริง เช่น Sensitivity/Delta/Gearing/Days ให้แล้ว
-                    #  ไม่ใช่การเลือก "ตัวที่ดีที่สุด" แทนผู้ใช้ - แค่จำกัดความยาวข้อความ)
                     best_dw = dw_list[:3]
-
                     primary_dw = best_dw[0]
 
                     sens = float(
@@ -447,7 +459,6 @@ def run_scan_cycle(force_send=False):
                         or 0
                     )
 
-                    # รองรับทั้ง abs_delta และ delta ปกติ (แก้ปัญหา PUT Delta ติดลบ)
                     delta = float(
                         primary_dw.get(
                             "abs_delta",
@@ -485,10 +496,6 @@ Gearing  : {gearing}
 """
                     )
 
-                # ==================================================
-                # FOREX
-                # ==================================================
-
                 else:
                     best_dw = "FOREX"
 
@@ -499,22 +506,13 @@ Gearing  : {gearing}
                         True
                     )
 
-                # ==================================================
-                # COOLDOWN ALERT CHECK
-                # ==================================================
-
                 alert_key = f"{symbol}_{trend}_{primary_dw.get('symbol') if is_stock else 'FOREX'}"
                 if alert_key in last_alerts:
                     if current_timestamp - last_alerts[alert_key] < COOLDOWN_TIME:
                         logging.info(f"{symbol} SKIPPED DUE TO COOLDOWN")
                         continue
 
-                # บันทึกเวลาที่แจ้งเตือนล่าสุด
                 last_alerts[alert_key] = current_timestamp
-
-                # ==================================================
-                # FORMAT MESSAGE
-                # ==================================================
 
                 message = format_dw_message(
                     trend=trend,
@@ -543,12 +541,6 @@ Gearing  : {gearing}
                     message
                 )
 
-            # ==================================================
-            # BUILD QUEUE
-            # ไม่มีการจัดอันดับ/เลือกตัวเด็ดแทนผู้ใช้อีกต่อไป
-            # ส่งทุกสัญญาณที่ผ่าน Filter ในรอบสแกนนี้
-            # ==================================================
-
             signal_queue.clear()
 
             for item in candidate_signals:
@@ -556,18 +548,12 @@ Gearing  : {gearing}
                     item["message"]
                 )
 
-            # ==================================================
-            # SEND (ถึงเวลาจริง หรือถูกบังคับด้วย force_send)
-            # ==================================================
-
             send_success = False
+
+            logging.info(debug_report())
 
             if should_send:
                 send_success = send_queue()
-
-            # ==================================================
-            # CLEAN MEMORY
-            # ==================================================
 
             cleanup_cache(
                 price_cache,
@@ -577,12 +563,6 @@ Gearing  : {gearing}
 
     return send_success
 
-
-# ==========================================================
-# CONTINUOUS MODE
-# รันตลอดในเครื่อง/เซิร์ฟเวอร์ที่เปิดค้างได้ (ไม่เหมาะกับ GitHub Actions)
-# สำหรับ GitHub Actions ให้ใช้ run_once.py แทน
-# ==========================================================
 
 def main():
     logging.info(
@@ -603,10 +583,6 @@ def main():
             )
             time.sleep(60)
 
-
-# ==========================================================
-# START
-# ==========================================================
 
 if __name__ == "__main__":
     main()
