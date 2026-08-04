@@ -258,11 +258,12 @@ def send_queue():
     global last_send_time
 
     if signal_queue:
-        msg = "\n\n".join(
-            signal_queue
-        )
-
-        ok = send_line(msg)
+        # FIX: ส่ง list ของแต่ละ signal message ตรง ๆ แทนที่จะ
+        # join รวมเป็นก้อนเดียวก่อน - ให้ send_line() เป็นคนแบ่ง
+        # เป็นหลาย message ตามความยาว UTF-16 จริงแทน (กันปัญหา
+        # โดน LINE ตอบ 400 "Length must be between 0 and 5000"
+        # ตอนมีหลาย signal พร้อมกันจนข้อความรวมยาวเกิน)
+        ok = send_line(list(signal_queue))
 
         if ok:
             logging.info(
