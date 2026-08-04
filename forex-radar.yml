@@ -1,0 +1,45 @@
+name: Forex Radar - Scheduled Run
+
+on:
+  schedule:
+    # เวลาไทย (Asia/Bangkok) ตรงกับ SEND_TIMES ใน config.py
+    # ใช้ field timezone (รองรับตั้งแต่ มี.ค. 2026) ไม่ต้องแปลงเป็น UTC เอง
+    - cron: "30 10 * * 1-5"
+      timezone: "Asia/Bangkok"
+      # 10:30 จ-ศ เวลาไทย
+    - cron: "0 14 * * 1-5"
+      timezone: "Asia/Bangkok"
+      # 14:00 จ-ศ เวลาไทย
+    - cron: "0 19 * * 1-5"
+      timezone: "Asia/Bangkok"
+      # 19:00 จ-ศ เวลาไทย (รอบเย็น)
+  workflow_dispatch: {}
+    # กดรันมือได้จากแท็บ Actions เพื่อทดสอบ โดยไม่ต้องรอถึงเวลาจริง
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run offline pipeline test (safety check ก่อนส่งจริง)
+        run: python test_pipeline_offline.py
+
+      - name: Run bot once
+        env:
+          # ตั้งค่า Secret เหล่านี้ใน GitHub repo:
+          # Settings -> Secrets and variables -> Actions -> New repository secret
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python run_once.py

@@ -170,49 +170,6 @@ def format_dw_message(
 
 
 
-    # ======================================================
-    # FIBONACCI
-    # ======================================================
-
-    if isinstance(fibo, dict):
-
-
-        lines.append(
-            "📍 Fibonacci Plan"
-        )
-
-
-        if fibo.get("entry"):
-
-            lines.append(
-                f"Entry : {fibo.get('entry')}"
-            )
-
-
-        if fibo.get("stop_loss"):
-
-            lines.append(
-                f"Stop Loss : {fibo.get('stop_loss')}"
-            )
-
-
-        if fibo.get("tp1"):
-
-            lines.append(
-                f"TP1 : {fibo.get('tp1')}"
-            )
-
-
-        if fibo.get("tp2"):
-
-            lines.append(
-                f"TP2 : {fibo.get('tp2')}"
-            )
-
-
-        lines.append("")
-
-
 
     # ======================================================
     # PRICE ACTION
@@ -364,61 +321,6 @@ def format_dw_message(
 
         lines.append("")
 
-
-
-    # ======================================================
-    # TRADE PLAN
-    # ======================================================
-
-
-    lines.append(
-        "💡 Trade Plan"
-    )
-
-
-    if dw_type == "CALL":
-
-
-        lines.append(
-            "• ใช้ CALL DW ตาม Trend"
-        )
-
-
-        lines.append(
-            "• รอจังหวะย่อเข้าแนวรับ"
-        )
-
-
-
-    elif dw_type == "PUT":
-
-
-        lines.append(
-            "• ใช้ PUT DW ตาม Trend"
-        )
-
-
-        lines.append(
-            "• รอเด้งเข้าแนวต้าน"
-        )
-
-
-
-    else:
-
-
-        lines.append(
-            "• รอสัญญาณใหม่"
-        )
-
-
-
-    lines.append(
-        "• ตัดขาดทุนเมื่อ Trend เปลี่ยน"
-    )
-
-
-    lines.append("")
 
 
     lines.append(
