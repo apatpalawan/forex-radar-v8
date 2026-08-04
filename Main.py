@@ -375,6 +375,11 @@ def run_scan_cycle(force_send=False):
                 price_cache
             )
 
+            # FIX: หน่วงเวลาสั้น ๆ ระหว่าง symbol ที่ดึงจริง (ไม่โดน cache)
+            # เพื่อไม่ให้ยิง request หา Yahoo รัวเกินไปทั้งรอบสแกน
+            # ซึ่งเป็นสาเหตุหลักที่ทำให้โดน rate-limit/บล็อกจน "Data OK: 0"
+            time.sleep(1)
+
         if df is None:
             scan_debug["reject"]["no_data"] += 1
             logging.info(

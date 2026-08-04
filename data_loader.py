@@ -16,6 +16,7 @@
 
 
 import time
+import random
 import logging
 from datetime import datetime, timedelta
 
@@ -37,6 +38,36 @@ from config import (
 )
 
 
+# ==========================================
+# FIX (Aug 2026): Yahoo Finance เริ่มบล็อก/rate-limit
+# request ที่มาจาก IP กลุ่ม cloud/datacenter (รวมถึง
+# GitHub Actions runner) มากขึ้นเรื่อย ๆ ทำให้ก่อนหน้านี้
+# ที่ _download_ohlc retry 3 รอบ x ลอง 6 ช่วงเวลา = ยิง
+# request รัว ๆ ได้ถึง 18 ครั้ง/symbol แบบไม่หน่วงเวลา
+# กลายเป็นตัวกระตุ้นให้โดนบล็อกเร็วขึ้นไปอีก
+#
+# วิธีแก้:
+# 1) ใช้ curl_cffi session ปลอมตัวเป็นเบราว์เซอร์จริง
+#    (วิธีมาตรฐานที่ทีม yfinance/ชุมชนแนะนำตอนนี้)
+# 2) หน่วงเวลาแบบสุ่ม (jitter) ระหว่างการลองแต่ละครั้ง
+#    และตัดจำนวน fallback window ให้น้อยลง ลด request รวม
+# ==========================================
+
+try:
+    from curl_cffi import requests as curl_requests
+
+    _YF_SESSION = curl_requests.Session(
+        impersonate="chrome",
+    )
+
+except ImportError:
+    logging.warning(
+        "curl_cffi ไม่ได้ติดตั้ง (pip install curl_cffi) "
+        "-> ใช้ session ปกติของ yfinance แทน "
+        "(เสี่ยงโดน Yahoo rate-limit ง่ายกว่า)"
+    )
+    _YF_SESSION = None
+
 
 # ==========================================
 # DOWNLOAD SETTINGS
@@ -44,7 +75,7 @@ from config import (
 
 DOWNLOAD_TIMEOUT = 15
 
-MAX_RETRY = 3
+MAX_RETRY = 2
 
 
 # ==========================================================
@@ -65,13 +96,20 @@ MAX_RETRY = 3
 # เรื่อย ๆ แทน
 # ==========================================================
 
+# FIX: ลดจาก 5 ช่วงเหลือ 2 ช่วง (พอสำหรับ indicator ที่ใช้จริง
+# LOOKBACK=700 วันใน config.py) เพื่อลดจำนวน request ต่อ symbol
 FALLBACK_LOOKBACK_DAYS = [
-    365 * 15,  # ~15 ปี
     365 * 5,   # 5 ปี
     365 * 2,   # 2 ปี
-    365,       # 1 ปี
-    180,       # 6 เดือน
 ]
+
+
+def _jitter_sleep(base_seconds):
+    # หน่วงเวลาแบบสุ่มเล็กน้อย ไม่ให้ทุก request รัวติดกันเป๊ะ ๆ
+    # (pattern ที่สม่ำเสมอเกินไปก็เป็นสัญญาณที่ anti-bot จับได้ง่าย)
+    time.sleep(
+        base_seconds + random.uniform(0.5, 1.5)
+    )
 
 
 def _download_ohlc(ticker, symbol):
@@ -87,6 +125,7 @@ def _download_ohlc(ticker, symbol):
             auto_adjust=False,
             threads=False,
             timeout=DOWNLOAD_TIMEOUT,
+            session=_YF_SESSION,
         )
 
         if df is not None and not df.empty:
@@ -97,9 +136,19 @@ def _download_ohlc(ticker, symbol):
         )
 
     except Exception as e:
-        logging.warning(
-            f"{symbol} period=max ใช้ไม่ได้ ({e}) -> ลองใช้ start/end แทน"
-        )
+        # FIX: log ให้เห็นชัดว่าเป็น rate-limit/block จริงหรือไม่
+        # (ก่อนหน้านี้ log แบบกำกวมทำให้แยกไม่ออกจาก error อื่น)
+        err_text = str(e)
+        if "Rate limit" in err_text or "Too Many Requests" in err_text or "429" in err_text:
+            logging.warning(
+                f"{symbol} โดน Yahoo RATE-LIMIT/บล็อก ({e}) -> ลองใช้ start/end แทน"
+            )
+        else:
+            logging.warning(
+                f"{symbol} period=max ใช้ไม่ได้ ({e}) -> ลองใช้ start/end แทน"
+            )
+
+    _jitter_sleep(1.5)
 
     # Fallback: ไล่ลองช่วงวันที่แบบชัดเจน (start=/end=) แทนคำว่า "max"
     end_date = datetime.now()
@@ -117,6 +166,7 @@ def _download_ohlc(ticker, symbol):
                 auto_adjust=False,
                 threads=False,
                 timeout=DOWNLOAD_TIMEOUT,
+                session=_YF_SESSION,
             )
 
             if df is not None and not df.empty:
@@ -129,6 +179,8 @@ def _download_ohlc(ticker, symbol):
             logging.warning(
                 f"{symbol} start/end ย้อนหลัง {days} วัน ล้มเหลว: {e}"
             )
+
+        _jitter_sleep(1.5)
 
     return None
 
@@ -250,7 +302,7 @@ def get_data(
                     f"{symbol} EMPTY DATA"
                 )
 
-                time.sleep(2)
+                _jitter_sleep(3)
 
                 continue
 
@@ -472,7 +524,7 @@ def get_data(
             )
 
 
-            time.sleep(3)
+            _jitter_sleep(3)
 
 
 
