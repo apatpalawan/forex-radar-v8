@@ -2,17 +2,17 @@ name: Forex Radar - Scheduled Run
 
 on:
   schedule:
-    # เวลาไทย (Asia/Bangkok) ตรงกับ SEND_TIMES ใน config.py
-    # ใช้ field timezone (รองรับตั้งแต่ มี.ค. 2026) ไม่ต้องแปลงเป็น UTC เอง
-    - cron: "30 10 * * 1-5"
-      timezone: "Asia/Bangkok"
-      # 10:30 จ-ศ เวลาไทย
-    - cron: "0 14 * * 1-5"
-      timezone: "Asia/Bangkok"
-      # 14:00 จ-ศ เวลาไทย
-    - cron: "0 19 * * 1-5"
-      timezone: "Asia/Bangkok"
-      # 19:00 จ-ศ เวลาไทย (รอบเย็น)
+    # GitHub Actions cron เป็น UTC เสมอ (เวลาไทย = UTC+7 ตลอดปี ไม่มี DST)
+    # แปลงเวลาไทยเป็น UTC เอง แทนการใช้ field timezone: ที่เพิ่งเปิดตัว
+    # ปลาย มี.ค. 2026 - เพราะทดสอบแล้วพบว่า schedule ไม่ทำงานเลยสักครั้ง
+    # (รันได้แค่ manual trigger เท่านั้น) จึงกลับมาใช้วิธี UTC ดั้งเดิม
+    # ที่เสถียรและผ่านการพิสูจน์มานาน
+    - cron: "30 3 * * 1-5"
+      # 10:30 น. เวลาไทย (จ-ศ)
+    - cron: "0 7 * * 1-5"
+      # 14:00 น. เวลาไทย (จ-ศ)
+    - cron: "0 12 * * 1-5"
+      # 19:00 น. เวลาไทย (จ-ศ)
   workflow_dispatch: {}
     # กดรันมือได้จากแท็บ Actions เพื่อทดสอบ โดยไม่ต้องรอถึงเวลาจริง
 
