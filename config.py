@@ -1,280 +1,47 @@
-# ==========================================
-# FOREX RADAR V8.6 PROFESSIONAL
-# CONFIGURATION
-# ==========================================
-
-
-# Version
-VERSION = "8.6"
-
-
-
-# ==========================================
-# SCAN SETTINGS
-# ==========================================
-
-SCAN_INTERVAL = 60
-
-
-
-# ==========================================
-# LINE NOTIFY SEND TIME
-# ==========================================
-
-SEND_TIMES = [
-
-    "10:30",
-    "14:35",
-    "19:00"
-
-]
-
-
-
-# ==========================================
-# THAI STOCK LIST
-# ==========================================
-
-STOCKS = [
-
-    "ADVANC",
-    "AOT",
-    "KBANK",
-    "SCB",
-    "BBL",
-    "PTT",
-    "PTTEP",
-    "CPALL",
-    "DELTA",
-    "GULF",
-    "CPN"
-
-]
-
-
-
-# ==========================================
-# FOREX LIST
-# ==========================================
-
-FOREX = [
-
-    "XAUUSD",
-    "EURUSD",
-    "GBPUSD",
-    "USDJPY"
-
-]
-
-
-
-# ==========================================
-# YAHOO FINANCE TICKER MAP
-# ==========================================
-
-TICKER_MAP = {
-
-
-    # SET50 (ใช้ TDEX.BK ETF แทน ^SET50.BK ดิบ - ดูเหตุผลใน data_loader.py)
-
-    "^SET50":
-    "TDEX.BK",
-
-
-
-    # GOLD
-
-    "XAUUSD":
-    "GC=F",
-
-
-
-    # FOREX
-
-    "EURUSD":
-    "EURUSD=X",
-
-
-    "GBPUSD":
-    "GBPUSD=X",
-
-
-    "USDJPY":
-    "JPY=X"
-
-}
-
-
-
-# ==========================================
-# DW SETTINGS
-# ==========================================
-
-# ==========================================
-# DW API SETTINGS
-# ==========================================
-# ใช้ API ของผู้ออก DW แทน SET
-USE_SET_DW_API = False
-# โหลดข้อมูลจากผู้ออก DW พร้อมกัน
-DW_API_TIMEOUT = 15
-# หน่วงเวลาระหว่างเรียก API (วินาที)
-DW_API_DELAY = 0.2
-# จำนวน Thread สำหรับโหลดข้อมูล
-DW_MAX_WORKERS = 8
-# เปิด Debug
-DW_DEBUG = True
-
-
-# เลือกเฉพาะผู้ออก DW
-# BLS = บัวหลวง
-# YUANTA = หยวนต้า
-
-ALLOWED_DW_ISSUERS = [
-
-    "BLS",
-    "YUANTA"
-
-]
-
-
-
-# Minimum DW Quality Filter
-
-MIN_SENSITIVITY = 1.0
-
-MIN_DELTA = 0.30
-
-MIN_GEARING = 5
-
-MAX_SPREAD = 0.02
-
-MIN_DAYS_LEFT = 30
-
-MIN_DW_SCORE = 75
-
-
-
-# Fallback Filter
-
-DW_FALLBACK_SENSITIVITY = 0.95
-
-
-
-# Issuer Priority Weight
-
-PREFERRED_ISSUER_WEIGHT = {
-
-    "BLS": 5,
-
-    "YUANTA": 5
-
-}
-
-
-
-# ==========================================
-# CACHE SETTINGS
-# ==========================================
-
-PRICE_CACHE_TTL = 300
-
-DW_CACHE_TTL = 900
-
-MAX_ALERT_MEMORY = 200
-
-
-
-# ==========================================
-# DATA SETTINGS
-# ==========================================
-
-TIMEFRAME = "1d"
-
-LOOKBACK = 700
-
-
-
-# ==========================================
-# THAI MARKET TIME
-# ==========================================
-
-MARKET_OPEN_HOUR = 9
-
-MARKET_OPEN_MINUTE = 0
-
-MARKET_CLOSE_HOUR = 17
-
-MARKET_CLOSE_MINUTE = 0
-
-
-
-# ==========================================
-# RISK MANAGEMENT
-# ==========================================
-
-RISK_SETTINGS = {
-
-    "MAX_POSITION":
-    0.05,
-
-
-    "STOP_LOSS_PERCENT":
-    3,
-
-
-    "TAKE_PROFIT_PERCENT":
-    6
-
-}
-
-
-
-# ==========================================
-# SYMBOL NORMALIZE
-# ==========================================
-
-SYMBOL_ALIAS = {
-
-
-    "^SET50.BK":
-    "SET50",
-
-
-    "^SET50":
-    "SET50"
-
-}
-
-
-
-# ==========================================
-# DW ISSUER API
-# ==========================================
-
-DW_ISSUER_API = {
-
-    "BLS": {
-        "enabled": True
-    },
-
-    "YUANTA": {
-        "enabled": True
-    },
-
-    "KGI": {
-        "enabled": False
-    },
-
-    "MACQ": {
-        "enabled": False
-    },
-
-    "CGSI": {
-        "enabled": False
-    },
-
-    "JPM": {
-        "enabled": False
-    }
-
-}
+name: Forex Radar - Scheduled Run
+
+on:
+  schedule:
+    # GitHub Actions cron เป็น UTC เสมอ (เวลาไทย = UTC+7 ตลอดปี ไม่มี DST)
+    # แปลงเวลาไทยเป็น UTC เอง แทนการใช้ field timezone: ที่เพิ่งเปิดตัว
+    # ปลาย มี.ค. 2026 - เพราะทดสอบแล้วพบว่า schedule ไม่ทำงานเลยสักครั้ง
+    # (รันได้แค่ manual trigger เท่านั้น) จึงกลับมาใช้วิธี UTC ดั้งเดิม
+    # ที่เสถียรและผ่านการพิสูจน์มานาน
+    - cron: "30 3 * * 1-5"
+      # 10:30 น. เวลาไทย (จ-ศ)
+    - cron: "35 7 * * 1-5"
+      # 14:35 น. เวลาไทย (จ-ศ) - เลื่อนจาก 14:00 เพราะตลาดหุ้นไทย
+      # ยังพักเที่ยงอยู่ (เปิดบ่ายจริง 14:25) เลื่อนมา 14:35 กันเผื่อ
+      # จะได้เจอหุ้นไทย/DW ครบทุกรอบ ไม่ใช่แค่ forex/ทอง
+    - cron: "0 12 * * 1-5"
+      # 19:00 น. เวลาไทย (จ-ศ)
+  workflow_dispatch: {}
+    # กดรันมือได้จากแท็บ Actions เพื่อทดสอบ โดยไม่ต้องรอถึงเวลาจริง
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run offline pipeline test (safety check ก่อนส่งจริง)
+        run: python test_pipeline_offline.py
+
+      - name: Run bot once
+        env:
+          # ตั้งค่า Secret เหล่านี้ใน GitHub repo:
+          # Settings -> Secrets and variables -> Actions -> New repository secret
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python run_once.py
