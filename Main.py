@@ -32,7 +32,7 @@ from market_filter import get_market_trend
 from signal_engine import analyze_signal
 from line_notify import send_line
 from cache_manager import cleanup_cache
-from dw_formatter import format_dw_message
+from dw_formatter import format_dw_message, format_forex_message
 from dw_scanner import get_best_dw
 
 
@@ -627,25 +627,31 @@ Gearing : {gearing}
 
         last_alerts[alert_key] = current_timestamp
 
-        message = format_dw_message(
-            trend=trend,
-            symbol=(
-                "SET50"
-                if symbol == "^SET50"
-                else symbol
-            ),
-            dw=best_dw,
-            market=market,
-            price_action=signal.get(
-                "price_action"
-            ),
-            fibo=signal.get(
-                "fibonacci"
-            ),
-            risk=risk,
-            target=target,
-            hold=hold
-        )
+        if is_stock:
+            message = format_dw_message(
+                trend=trend,
+                symbol=(
+                    "SET50"
+                    if symbol == "^SET50"
+                    else symbol
+                ),
+                dw=best_dw,
+                market=market,
+                price_action=signal.get(
+                    "price_action"
+                ),
+                fibo=signal.get(
+                    "fibonacci"
+                ),
+                risk=risk,
+                target=target,
+                hold=hold
+            )
+        else:
+            message = format_forex_message(
+                trend=trend,
+                symbol=symbol
+            )
 
         add_candidate(
             symbol,
