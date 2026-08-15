@@ -8,6 +8,28 @@
 # ==========================================================
 
 
+def format_forex_message(
+    trend,
+    symbol
+):
+    # ข้อความสั้นสำหรับ forex: คู่เงิน + สัญญาณเท่านั้น
+    # (ประหยัดโควต้าข้อความ LINE OA)
+
+    if trend in ["BUY", "BULLISH"]:
+        icon = "🟢"
+        signal_text = "BUY"
+
+    elif trend in ["SELL", "BEARISH"]:
+        icon = "🔴"
+        signal_text = "SELL"
+
+    else:
+        icon = "🟡"
+        signal_text = "WAIT"
+
+    return f"{icon} {symbol} : {signal_text}"
+
+
 def format_dw_message(
     trend,
     symbol,
