@@ -3,9 +3,7 @@
 # BLS V11.3 FILTER ENGINE
 # DATA FILTER ONLY - NO SCORE
 # ==========================================
-
 import logging
-
 
 from bls_api import get_scanner_data
 
@@ -16,432 +14,246 @@ except Exception:
     # ด้วย BLS อย่างเดียว (ไม่ crash ทั้งระบบเพราะ Yuanta)
     get_yuanta_dw = None
 
-
-
 logging.basicConfig(
-
     level=logging.INFO,
-
     format="%(asctime)s | %(levelname)s | %(message)s"
-
 )
-
-
 
 # ==========================================
 # CONFIG
 # ==========================================
-
-
 MIN_SENSITIVITY = 0.95
-
 MIN_DELTA = 0.30
-
 MIN_GEARING = 5
-
 MIN_DAYS = 30
-
 MAX_SPREAD = 0.02
 
-
 ALLOW_ISSUER = [
-
     "BLS",
     "YUANTA",
     "KGI",
     "KS",
     "MST"
-
 ]
 
-
 RETURN_LIMIT = 5
-
-
-
 
 
 # ==========================================
 # SAFE
 # ==========================================
-
-
 def safe_float(value):
-
     try:
-
         return float(value)
-
     except:
-
         return 0.0
 
 
-
-
-
 def safe_int(value):
-
     try:
-
         return int(value)
-
     except:
-
         return 0
-
-
-
 
 
 # ==========================================
 # FILTER CHECK
 # ==========================================
-
-
-def pass_filter(dw, trend):
-
-
+def pass_filter(dw, trend, min_sensitivity=None):
     dw_type = str(
-
         dw.get(
             "type",
             ""
-
         )
-
     ).upper()
-
-
 
     # ----------------------------
     # CALL / PUT Direction
     # ----------------------------
-
-
     if trend == "BUY":
-
         if dw_type != "CALL":
-
             return False
-
-
-
     elif trend == "SELL":
-
         if dw_type != "PUT":
-
             return False
-
-
-
-
 
     # ----------------------------
     # Issuer
     # ----------------------------
-
     issuer = str(
-
         dw.get(
             "issuer",
             ""
-
         )
-
     ).upper()
-
-
 
     # BLS V11.3 บาง endpoint ไม่มี issuer
     # ถ้ามีค่อยตรวจ
-
     if issuer:
-
         if issuer not in ALLOW_ISSUER:
-
             return False
-
-
-
-
 
     # ----------------------------
     # Sensitivity
+    # FIX: เพิ่ม min_sensitivity เป็น parameter (optional) เพื่อให้
+    # ผู้เรียก (เช่น volume_scanner สำหรับสัญญาณ Volume ผิดปกติ)
+    # เข้มงวดเรื่อง sensitivity ได้มากกว่าเดิมโดยไม่กระทบ pipeline
+    # เดิม (EMA Trend/Score) ซึ่งยังใช้ค่า MIN_SENSITIVITY เดิม
+    # (0.95) ถ้าไม่ส่ง min_sensitivity เข้ามา
     # ----------------------------
-
-
     sensitivity = safe_float(
-
         dw.get(
             "sensitivity"
         )
-
     )
 
+    threshold = (
+        min_sensitivity
+        if min_sensitivity is not None
+        else MIN_SENSITIVITY
+    )
 
-    if sensitivity < MIN_SENSITIVITY:
-
+    if sensitivity < threshold:
         return False
-
-
-
-
 
     # ----------------------------
     # Delta
     # ----------------------------
-
-
     delta = safe_float(
-
         dw.get(
             "delta",
-
             dw.get(
                 "abs_delta",
                 0
             )
-
         )
-
     )
-
-
     delta = abs(delta)
 
-
     if delta < MIN_DELTA:
-
         return False
-
-
-
-
 
     # ----------------------------
     # Gearing
     # ----------------------------
-
-
     gearing = safe_float(
-
         dw.get(
             "effective_gearing"
         )
-
     )
 
-
     if gearing < MIN_GEARING:
-
         return False
-
-
-
-
 
     # ----------------------------
     # Days
     # ----------------------------
-
-
     days = safe_int(
-
         dw.get(
             "days_left"
         )
-
     )
 
-
     if days < MIN_DAYS:
-
         return False
-
-
-
-
 
     # ----------------------------
     # Spread
     # ----------------------------
-
-
     spread = safe_float(
-
         dw.get(
             "spread"
         )
-
     )
 
-
     if spread > MAX_SPREAD:
-
         return False
-
-
-
-
 
     # ----------------------------
     # Liquidity
     # ----------------------------
-
-
     liquidity = str(
-
         dw.get(
             "liquidity",
             ""
-
         )
-
     ).upper()
 
-
-
     if liquidity == "WIDE":
-
         return False
 
-
-
-
-
     return True
-
-
-
-
-
 
 
 # ==========================================
 # SORT QUALITY
 # ==========================================
-
-
 def sort_quality(dw):
-
     """
     เรียงคุณภาพ DW
     ไม่ใช่ Score
     """
-
-
     return (
-
         safe_float(
-
             dw.get(
                 "sensitivity"
             )
-
         ),
-
-
         abs(
-
             safe_float(
-
                 dw.get(
                     "delta"
                 )
-
             )
-
         ),
-
-
         safe_float(
-
             dw.get(
                 "effective_gearing"
             )
-
         ),
-
-
         safe_int(
-
             dw.get(
                 "days_left"
             )
-
         )
-
     )
-
-
-
-
-
-
 
 
 # ==========================================
 # MAIN SCANNER
 # ==========================================
-
-
 def get_filtered_dw(
-
-        underlying="SET50",
-
-        trend="BUY"
-
+    underlying="SET50",
+    trend="BUY",
+    min_sensitivity=None
 ):
-
-
     logging.info(
-
-        f"DW FILTER START | {underlying} | {trend}"
-
+        f"DW FILTER START | {underlying} | {trend} | "
+        f"min_sensitivity={min_sensitivity if min_sensitivity is not None else MIN_SENSITIVITY}"
     )
-
-
 
     raw = list(get_scanner_data() or [])
 
     # เพิ่ม Yuanta (dw19club.com) เข้ามารวมกับ BLS
     # ขอเฉพาะ underlying ที่ต้องการตรง ๆ (API ของ Yuanta filter ได้เอง)
     if get_yuanta_dw is not None:
-
         try:
             yuanta_raw = get_yuanta_dw(underlying)
-
             if yuanta_raw:
                 raw += yuanta_raw
-
         except Exception as e:
             logging.warning(f"YUANTA MERGE FAIL : {e}")
 
     if not raw:
-
-
         logging.warning(
-
             "NO DW DATA (BLS + YUANTA)"
-
         )
-
-
         return []
 
-
-
-
-
     result = []
-
-
-
     target_underlying = str(underlying).upper()
 
     for dw in raw:
-
         dw_underlying = str(
             dw.get("underlying", "")
         ).upper()
@@ -452,140 +264,67 @@ def get_filtered_dw(
             continue
 
         if pass_filter(
-
             dw,
-
-            trend
-
+            trend,
+            min_sensitivity=min_sensitivity
         ):
-
             result.append(dw)
 
-
-
-
-
-
-
     result.sort(
-
         key=sort_quality,
-
         reverse=True
-
     )
-
-
-
-
 
     logging.info(
-
         f"DW FILTER RESULT : {len(result)}"
-
     )
 
-
-
-
-
     return result[:RETURN_LIMIT]
-
-
-
-
-
-
-
 
 
 # ==========================================
 # COMPATIBILITY
 # ==========================================
-
-
 def get_best_dw(
-
-        underlying,
-
-        trend="BUY"
-
+    underlying,
+    trend="BUY",
+    min_sensitivity=None
 ):
-
     """
     Backward compatible
-    Main.py เดิมใช้ได้
+    Main.py เดิมใช้ได้ (min_sensitivity เป็น optional
+    ไม่ส่งมาก็ทำงานเหมือนเดิมทุกอย่าง)
     """
-
-
     return get_filtered_dw(
-
         underlying,
-
-        trend
-
+        trend,
+        min_sensitivity=min_sensitivity
     )
-
-
-
-
-
-
-
 
 
 # ==========================================
 # TEST
 # ==========================================
-
-
 if __name__ == "__main__":
-
-
-
     result = get_filtered_dw(
-
         "SET50",
-
         "BUY"
-
     )
-
-
 
     print()
-
     print("="*60)
-
     print(
-
         "FILTERED DW RESULT"
-
     )
-
     print("="*60)
-
-
-
-
 
     for dw in result:
-
-
         print(
-
             f"{dw.get('symbol',''):15}"
-
             f"{dw.get('type',''):5}"
-
             f"Sens={dw.get('sensitivity',0):.2f} "
-
             f"Gear={dw.get('effective_gearing',0):.2f} "
-
             f"Delta={dw.get('delta',0):.2f} "
-
             f"Days={dw.get('days_left',0)} "
-
             f"Spread={dw.get('spread',0):.3f}"
-
         )

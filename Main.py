@@ -1,5 +1,5 @@
 # ==========================================================
-# FOREX RADAR V9.2 PROFESSIONAL
+# FOREX RADAR V9.3 PROFESSIONAL
 # MAIN ENGINE
 #
 # Concept:
@@ -11,6 +11,9 @@
 # - Signal / Score / Trend separated
 # - No silent failure
 # - Ready for DW Filter Engine
+# - V9.3: เพิ่ม Volume Anomaly Scanner (หุ้นไทย) แยกอิสระจาก
+#   ระบบ EMA Trend/Score เดิม - เจอ Volume ผิดปกติ -> หา DW
+#   ที่ sensitivity ใกล้ 1 หรือมากกว่าให้ทันที
 # ==========================================================
 
 import time
@@ -25,6 +28,7 @@ from config import (
     FOREX,
     SCAN_INTERVAL,
     SEND_TIMES,
+    DW_FALLBACK_SENSITIVITY,
 )
 
 from data_loader import get_data
@@ -32,47 +36,43 @@ from market_filter import get_market_trend
 from signal_engine import analyze_signal
 from line_notify import send_line
 from cache_manager import cleanup_cache
-from dw_formatter import format_dw_message, format_forex_message
+from dw_formatter import format_dw_message
 from dw_scanner import get_best_dw
-
+from volume_scanner import detect_abnormal_volume
 
 # ==========================================================
 # CONFIG
 # ==========================================================
-
 # ปรับลดค่า Min Score ชั่วคราวเพื่อตรวจสอบ Pipeline ช่วง Debug
 STOCK_MIN_SCORE = 40
 FOREX_MIN_SCORE = 40
 
-DW_SCAN_DELAY = 1.0  
+DW_SCAN_DELAY = 1.0
 DW_CACHE_TIME = 900
-COOLDOWN_TIME = 1800  
+COOLDOWN_TIME = 1800
+
+# Volume Anomaly Scanner: sensitivity ที่อยากได้ก่อน (ใกล้ 1 หรือเกิน)
+VOLUME_ALERT_MIN_SENSITIVITY = 1.0
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-
 # ==========================================================
 # MEMORY
 # ==========================================================
-
 price_cache = {}
 dw_cache = {}
-last_alerts = {}     
-
+last_alerts = {}
 signal_queue = []
 candidate_signals = []
-
 last_send_time = None
-
 
 # ==========================================================
 # DEBUG SYSTEM V9.2
 # Track every pipeline stage
 # ==========================================================
-
 scan_debug = {
     "scan_count": 0,
     "data_pass": 0,
@@ -81,6 +81,7 @@ scan_debug = {
     "trend_pass": 0,
     "dw_pass": 0,
     "dw_fail": 0,
+    "volume_alert": 0,
     "reject": {
         "no_data": 0,
         "signal_none": 0,
@@ -104,6 +105,7 @@ def reset_debug():
         "trend_pass": 0,
         "dw_pass": 0,
         "dw_fail": 0,
+        "volume_alert": 0,
         "reject": {
             "no_data": 0,
             "signal_none": 0,
@@ -118,46 +120,37 @@ def reset_debug():
 
 
 def debug_report():
-    if scan_debug["signal_found"] > 0:
+    if scan_debug["signal_found"] > 0 or scan_debug["volume_alert"] > 0:
         result = "SIGNAL FOUND"
     else:
         result = "NO SIGNAL"
 
     return f"""
 📊 Forex Radar V{VERSION}
-
 SCAN REPORT
-
 Symbol Scan : {scan_debug['scan_count']}
-
-Data OK     : {scan_debug['data_pass']}
-
-Signal      : {scan_debug['signal_found']}
-
-Score Pass  : {scan_debug['score_pass']}
-
-Trend Pass  : {scan_debug['trend_pass']}
-
-DW Pass     : {scan_debug['dw_pass']}
-
-DW Fail     : {scan_debug['dw_fail']}
+Data OK : {scan_debug['data_pass']}
+Signal : {scan_debug['signal_found']}
+Score Pass : {scan_debug['score_pass']}
+Trend Pass : {scan_debug['trend_pass']}
+DW Pass : {scan_debug['dw_pass']}
+DW Fail : {scan_debug['dw_fail']}
+Volume Alert : {scan_debug['volume_alert']}
 
 REJECT REASON
-No Data     : {scan_debug['reject']['no_data']}
-No Signal   : {scan_debug['reject']['signal_none']}
-Score Low   : {scan_debug['reject']['score_low']}
-Sideway     : {scan_debug['reject']['sideway']}
-DW Fail     : {scan_debug['reject']['dw_fail']}
-Error       : {scan_debug['reject']['error']}
+No Data : {scan_debug['reject']['no_data']}
+No Signal : {scan_debug['reject']['signal_none']}
+Score Low : {scan_debug['reject']['score_low']}
+Sideway : {scan_debug['reject']['sideway']}
+DW Fail : {scan_debug['reject']['dw_fail']}
+Error : {scan_debug['reject']['error']}
 
 Result:{result}
 """
 
-
 # ==========================================================
 # TIME & MARKET SCHEDULE
 # ==========================================================
-
 def thai_now():
     try:
         return datetime.now(
@@ -194,16 +187,14 @@ def thai_market_open():
 
     return morning or afternoon
 
-
 # ==========================================================
 # RISK SYSTEM
 # ==========================================================
-
 def get_risk_level(
-        sens,
-        delta,
-        gearing=0,
-        is_forex=False
+    sens,
+    delta,
+    gearing=0,
+    is_forex=False
 ):
     if is_forex:
         return (
@@ -236,11 +227,9 @@ def get_risk_level(
         "Swing"
     )
 
-
 # ==========================================================
 # CANDIDATE MANAGEMENT
 # ==========================================================
-
 def add_candidate(symbol, message):
     candidate_signals.append(
         {
@@ -249,11 +238,9 @@ def add_candidate(symbol, message):
         }
     )
 
-
 # ==========================================================
 # LINE SEND SYSTEM
 # ==========================================================
-
 def send_queue():
     global last_send_time
 
@@ -275,7 +262,6 @@ def send_queue():
             )
 
         signal_queue.clear()
-
     else:
         ok = send_line(
             debug_report()
@@ -288,11 +274,9 @@ def send_queue():
 
     return ok
 
-
 # ==========================================================
 # DW SYMBOL MAPPING
 # ==========================================================
-
 SET50_MAPPING = {
     "SET50": "SET50",
     "S50": "SET50",
@@ -301,10 +285,20 @@ SET50_MAPPING = {
 }
 
 
-# ==========================================================
-# MAIN SCAN ENGINE V9.2
-# ==========================================================
+def _dw_symbol_for(symbol):
+    raw_dw_symbol = (
+        "SET50"
+        if symbol == "^SET50"
+        else symbol.replace(".BK", "")
+    )
+    return SET50_MAPPING.get(
+        raw_dw_symbol,
+        raw_dw_symbol
+    )
 
+# ==========================================================
+# MAIN SCAN ENGINE V9.3
+# ==========================================================
 def run_scan_cycle(force_send=False):
     global last_send_time
 
@@ -376,10 +370,10 @@ def run_scan_cycle(force_send=False):
                 price_cache
             )
 
-            # FIX: หน่วงเวลาสั้น ๆ ระหว่าง symbol ที่ดึงจริง (ไม่โดน cache)
-            # เพื่อไม่ให้ยิง request หา Yahoo รัวเกินไปทั้งรอบสแกน
-            # ซึ่งเป็นสาเหตุหลักที่ทำให้โดน rate-limit/บล็อกจน "Data OK: 0"
-            time.sleep(1)
+        # FIX: หน่วงเวลาสั้น ๆ ระหว่าง symbol ที่ดึงจริง (ไม่โดน cache)
+        # เพื่อไม่ให้ยิง request หา Yahoo รัวเกินไปทั้งรอบสแกน
+        # ซึ่งเป็นสาเหตุหลักที่ทำให้โดน rate-limit/บล็อกจน "Data OK: 0"
+        time.sleep(1)
 
         if df is None:
             scan_debug["reject"]["no_data"] += 1
@@ -397,12 +391,109 @@ def run_scan_cycle(force_send=False):
             f"""
 DATA DEBUG
 Symbol : {symbol}
-Close  : {df.iloc[-1].get('Close')}
-EMA9   : {df.iloc[-1].get('EMA9')}
-EMA21  : {df.iloc[-1].get('EMA21')}
-EMA50  : {df.iloc[-1].get('EMA50')}
+Close : {df.iloc[-1].get('Close')}
+EMA9 : {df.iloc[-1].get('EMA9')}
+EMA21 : {df.iloc[-1].get('EMA21')}
+EMA50 : {df.iloc[-1].get('EMA50')}
 """
         )
+
+        # ==================================================
+        # VOLUME ANOMALY SCAN (เฉพาะหุ้นไทยใน STOCKS)
+        #
+        # แยกอิสระจากระบบ Trend/Score EMA เดิมด้านล่าง - รันคู่กัน
+        # ไปทุกรอบโดยไม่ขึ้นกับผลของ analyze_signal() เลย ถ้าเจอ
+        # Volume ผิดปกติ จะหา DW ที่ sensitivity ใกล้ 1 หรือมากกว่า
+        # ให้ทันที (ผ่อนเป็น DW_FALLBACK_SENSITIVITY ถ้าหาไม่เจอ)
+        # ==================================================
+        if symbol in STOCKS:
+            try:
+                vol_hit = detect_abnormal_volume(symbol, df)
+            except Exception as e:
+                vol_hit = None
+                logging.exception(
+                    f"{symbol} VOLUME SCAN ERROR {e}"
+                )
+
+            if vol_hit:
+                vol_alert_key = (
+                    f"VOL_{symbol}_{vol_hit['direction']}"
+                )
+
+                on_cooldown = (
+                    vol_alert_key in last_alerts
+                    and
+                    (
+                        current_timestamp
+                        -
+                        last_alerts[vol_alert_key]
+                    )
+                    <
+                    COOLDOWN_TIME
+                )
+
+                if on_cooldown:
+                    logging.info(
+                        f"{symbol} VOLUME ALERT COOLDOWN"
+                    )
+                else:
+                    dw_symbol = _dw_symbol_for(symbol)
+
+                    vol_dw_list = get_best_dw(
+                        dw_symbol,
+                        vol_hit["direction"],
+                        min_sensitivity=VOLUME_ALERT_MIN_SENSITIVITY
+                    )
+
+                    if not vol_dw_list:
+                        # ไม่เจอ DW sensitivity >= 1 พอดี -> ผ่อนเกณฑ์
+                        # ลงมาที่ DW_FALLBACK_SENSITIVITY (ใกล้ 1 แทน)
+                        logging.info(
+                            f"{symbol} VOLUME ALERT : NO DW >= "
+                            f"{VOLUME_ALERT_MIN_SENSITIVITY}, "
+                            f"ลองผ่อนเป็น {DW_FALLBACK_SENSITIVITY}"
+                        )
+                        vol_dw_list = get_best_dw(
+                            dw_symbol,
+                            vol_hit["direction"],
+                            min_sensitivity=DW_FALLBACK_SENSITIVITY
+                        )
+
+                    if vol_dw_list:
+                        last_alerts[vol_alert_key] = current_timestamp
+                        scan_debug["volume_alert"] += 1
+
+                        vol_message = format_dw_message(
+                            trend=vol_hit["direction"],
+                            symbol=symbol,
+                            dw=vol_dw_list[:3],
+                            market=market,
+                            reasons=[
+                                f"Volume ผิดปกติ x{vol_hit['ratio']:.1f} "
+                                f"เท่าของค่าเฉลี่ย 20 วัน"
+                            ],
+                            risk="HIGH",
+                            target="Momentum",
+                            hold="Intraday",
+                        )
+
+                        add_candidate(
+                            f"VOL_{symbol}",
+                            vol_message
+                        )
+
+                        logging.info(
+                            f"{symbol} VOLUME ALERT SENT : "
+                            f"x{vol_hit['ratio']:.2f} "
+                            f"DIR={vol_hit['direction']} "
+                            f"DW={vol_dw_list[0].get('symbol')} "
+                            f"Sens={vol_dw_list[0].get('sensitivity')}"
+                        )
+                    else:
+                        logging.info(
+                            f"{symbol} VOLUME ALERT : NO DW PASSED "
+                            f"(แม้ผ่อนเกณฑ์แล้ว)"
+                        )
 
         try:
             signal = analyze_signal(
@@ -438,8 +529,8 @@ EMA50  : {df.iloc[-1].get('EMA50')}
             f"""
 ========== SIGNAL DEBUG ==========
 Symbol : {symbol}
-Trend  : {trend}
-Score  : {score}
+Trend : {trend}
+Score : {score}
 ==================================
 """
         )
@@ -473,22 +564,12 @@ Score  : {score}
 
         best_dw = None
         primary_dw = {}
-
         risk = "NORMAL"
         target = "Standard"
         hold = "Intraday"
 
         if is_stock:
-            raw_dw_symbol = (
-                "SET50"
-                if symbol == "^SET50"
-                else symbol.replace(".BK", "")
-            )
-
-            dw_symbol = SET50_MAPPING.get(
-                raw_dw_symbol,
-                raw_dw_symbol
-            )
+            dw_symbol = _dw_symbol_for(symbol)
 
             direction = (
                 "CALL"
@@ -557,7 +638,6 @@ Score  : {score}
                 )
                 or 0
             )
-
             delta = float(
                 primary_dw.get(
                     "abs_delta",
@@ -568,7 +648,6 @@ Score  : {score}
                 )
                 or 0
             )
-
             gearing = float(
                 primary_dw.get(
                     "effective_gearing",
@@ -586,17 +665,16 @@ Score  : {score}
             logging.info(
                 f"""
 DW FOUND
-Symbol  : {symbol}
-Trend   : {trend}
-Score   : {score}
-Count   : {len(best_dw)}
-Top DW  : {primary_dw.get('symbol')}
-Sens    : {sens}
-Delta   : {delta}
+Symbol : {symbol}
+Trend : {trend}
+Score : {score}
+Count : {len(best_dw)}
+Top DW : {primary_dw.get('symbol')}
+Sens : {sens}
+Delta : {delta}
 Gearing : {gearing}
 """
             )
-
         else:
             best_dw = "FOREX"
             risk, target, hold = get_risk_level(
@@ -627,31 +705,25 @@ Gearing : {gearing}
 
         last_alerts[alert_key] = current_timestamp
 
-        if is_stock:
-            message = format_dw_message(
-                trend=trend,
-                symbol=(
-                    "SET50"
-                    if symbol == "^SET50"
-                    else symbol
-                ),
-                dw=best_dw,
-                market=market,
-                price_action=signal.get(
-                    "price_action"
-                ),
-                fibo=signal.get(
-                    "fibonacci"
-                ),
-                risk=risk,
-                target=target,
-                hold=hold
-            )
-        else:
-            message = format_forex_message(
-                trend=trend,
-                symbol=symbol
-            )
+        message = format_dw_message(
+            trend=trend,
+            symbol=(
+                "SET50"
+                if symbol == "^SET50"
+                else symbol
+            ),
+            dw=best_dw,
+            market=market,
+            price_action=signal.get(
+                "price_action"
+            ),
+            fibo=signal.get(
+                "fibonacci"
+            ),
+            risk=risk,
+            target=target,
+            hold=hold
+        )
 
         add_candidate(
             symbol,
@@ -682,11 +754,9 @@ Gearing : {gearing}
 
     return send_success
 
-
 # ==========================================================
 # RUNNER
 # ==========================================================
-
 def main():
     logging.info(
         f"Forex Radar V{VERSION} START"
@@ -695,11 +765,9 @@ def main():
     while True:
         try:
             run_scan_cycle()
-
             time.sleep(
                 SCAN_INTERVAL
             )
-
         except Exception as e:
             logging.exception(
                 f"MAIN ERROR {e}"
