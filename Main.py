@@ -25,7 +25,6 @@ from zoneinfo import ZoneInfo
 from config import (
     VERSION,
     STOCKS,
-    FOREX,
     SCAN_INTERVAL,
     SEND_TIMES,
     DW_FALLBACK_SENSITIVITY,
@@ -340,8 +339,6 @@ def run_scan_cycle(force_send=False):
         ["^SET50"]
         +
         STOCKS
-        +
-        FOREX
     ):
         scan_debug["scan_count"] += 1
         scan_debug["symbols"].append(
@@ -722,7 +719,9 @@ Gearing : {gearing}
             ),
             risk=risk,
             target=target,
-            hold=hold
+            hold=hold,
+            score=score,
+            volume_spike=signal.get("volume_spike", False)
         )
 
         add_candidate(
