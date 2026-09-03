@@ -16,6 +16,8 @@
 #   python test_full_run_mock.py
 # ==========================================================
 
+import pandas as pd
+
 import Main
 import config
 
@@ -35,12 +37,18 @@ def check(name, condition):
 
 
 # ==========================================================
-# MOCK: get_data - แค่ต้องไม่ None ก็พอ (ข้างในไม่ได้ใช้ค่าจริง
-# เพราะ analyze_signal ก็ถูก mock แยกไว้แล้ว)
+# MOCK: get_data - ต้องเป็น DataFrame จริง (ไม่ใช่ dict เฉย ๆ)
+# เพราะ Main.py ตอนนี้ทำ df.iloc[-1].get('Close') ตรง ๆ ใน DATA
+# DEBUG log เสมอ ไม่ว่า analyze_signal จะถูก mock ไว้หรือไม่
+#
+# ตั้งใจไม่ใส่คอลัมน์ Volume/VOL_MA20 ให้ครบ เพื่อให้ตัวสแกน Volume
+# ผิดปกติ (volume_scanner.detect_abnormal_volume) bail ออกเองแบบ
+# ปลอดภัย (คืน None) และไม่มายุ่งกับเทสต์นี้ที่ตั้งใจทดสอบเฉพาะ
+# เส้นทาง EMA Trend/Score เดิมเท่านั้น
 # ==========================================================
 
 def fake_get_data(symbol, is_stock, cache):
-    return {"symbol": symbol}  # dummy object ที่ไม่ใช่ None
+    return pd.DataFrame({"Close": [100.0], "Open": [100.0]})
 
 
 # ==========================================================
@@ -63,7 +71,11 @@ FAKE_SIGNALS = {
     "AOT": {"score": 90, "trend": "SELL", "price_action": "Reversal", "fibonacci": "0.5"},
     "XAUUSD": {"score": 88, "trend": "BUY", "price_action": "Momentum", "fibonacci": "0.382"},  # ทอง
     "EURUSD": {"score": 75, "trend": "SELL", "price_action": None, "fibonacci": None},
-    "GBPUSD": {"score": 50, "trend": "BUY", "price_action": None, "fibonacci": None},  # ต่ำกว่าเกณฑ์
+    # FIX: Main.py's FOREX_MIN_SCORE is 40, so 50 actually PASSES the
+    # threshold (this line's old score of 50 never really tested the
+    # "below threshold" case it claimed to) - lowered to 35 so this
+    # genuinely exercises the score_low rejection path
+    "GBPUSD": {"score": 35, "trend": "BUY", "price_action": None, "fibonacci": None},  # ต่ำกว่าเกณฑ์
     "USDJPY": {"score": 72, "trend": "SIDEWAY", "price_action": None, "fibonacci": None},  # sideway -> ไม่ควรผ่าน
 }
 
@@ -76,7 +88,10 @@ def fake_analyze_signal(symbol, df):
 # MOCK: get_best_dw - จำลอง DW ที่มาจาก 2 ค่าย (BLS + YUANTA) ปนกัน
 # ==========================================================
 
-def fake_get_best_dw(underlying, trend):
+def fake_get_best_dw(underlying, trend, min_sensitivity=None):
+    # min_sensitivity: parameter ใหม่ที่ volume_scanner ใช้เรียก (ดู
+    # dw_scanner.py) - รับไว้เฉย ๆ ไม่ต้องใช้จริง เพราะเทสต์นี้ไม่ได้
+    # กระตุ้นเส้นทาง Volume Anomaly (ดู fake_get_data ด้านบน)
     if underlying == "PTT" and trend == "BUY":
         return [
             {
@@ -185,7 +200,14 @@ check(
     len(captured_messages) == 1
 )
 
-final_message = captured_messages[0] if captured_messages else ""
+# FIX: send_line() ตอนนี้อาจถูกเรียกด้วย list ของหลายข้อความ (แยกส่งเป็น
+# หลาย LINE push message แทนการ join รวมเป็นก้อนเดียว - ดู Main.py
+# send_queue()) ไม่ใช่ string ก้อนเดียวเหมือนตอนเขียนเทสต์นี้ครั้งแรก
+# -> รวมกลับเป็น string เดียวก่อน เพื่อให้ "X" in final_message ยังเช็ค
+# substring ได้ถูกต้องเหมือนเดิม ไม่ว่า captured_messages[0] จะเป็น
+# list หรือ string ก้อนเดียวก็ตาม
+_raw = captured_messages[0] if captured_messages else ""
+final_message = "\n".join(_raw) if isinstance(_raw, list) else _raw
 
 check(
     "มีสัญญาณของ PTT (หุ้น, score ผ่านเกณฑ์)",
