@@ -1,3 +1,4 @@
+@'
 name: Forex Radar - Scheduled Run
 
 on:
@@ -7,17 +8,19 @@ on:
     # ปลาย มี.ค. 2026 - เพราะทดสอบแล้วพบว่า schedule ไม่ทำงานเลยสักครั้ง
     # (รันได้แค่ manual trigger เท่านั้น) จึงกลับมาใช้วิธี UTC ดั้งเดิม
     # ที่เสถียรและผ่านการพิสูจน์มานาน
-      	- cron: "30 4 * * 1-5"    # 11:30 น. ไทย
-	- cron: "35 7 * * 1-5"    # 14:35 น. ไทย
-	- cron: "30 9 * * 1-5"    # 16:30 น. ไทย
+    - cron: "30 4 * * 1-5"
+    # 11:30 น. เวลาไทย (จ-ศ)
+    - cron: "35 7 * * 1-5"
+    # 14:35 น. เวลาไทย (จ-ศ)
+    - cron: "30 9 * * 1-5"
+    # 16:30 น. เวลาไทย (จ-ศ)
   workflow_dispatch: {}
-    # กดรันมือได้จากแท็บ Actions เพื่อทดสอบ โดยไม่ต้องรอถึงเวลาจริง
+  # กดรันมือได้จากแท็บ Actions เพื่อทดสอบ โดยไม่ต้องรอถึงเวลาจริง
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -40,3 +43,4 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python run_once.py
+'@ | Set-Content -Path .github\workflows\forex-radar.yml -Encoding UTF8
