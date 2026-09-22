@@ -2,19 +2,10 @@ name: Forex Radar - Scheduled Run
 
 on:
   schedule:
-    # GitHub Actions cron เป็น UTC เสมอ (เวลาไทย = UTC+7 ตลอดปี ไม่มี DST)
-    # แปลงเวลาไทยเป็น UTC เอง แทนการใช้ field timezone: ที่เพิ่งเปิดตัว
-    # ปลาย มี.ค. 2026 - เพราะทดสอบแล้วพบว่า schedule ไม่ทำงานเลยสักครั้ง
-    # (รันได้แค่ manual trigger เท่านั้น) จึงกลับมาใช้วิธี UTC ดั้งเดิม
-    # ที่เสถียรและผ่านการพิสูจน์มานาน
     - cron: "30 4 * * 1-5"
-    # 11:30 น. เวลาไทย (จ-ศ)
     - cron: "35 7 * * 1-5"
-    # 14:35 น. เวลาไทย (จ-ศ)
     - cron: "30 9 * * 1-5"
-    # 16:30 น. เวลาไทย (จ-ศ)
   workflow_dispatch: {}
-  # กดรันมือได้จากแท็บ Actions เพื่อทดสอบ โดยไม่ต้องรอถึงเวลาจริง
 
 jobs:
   run-bot:
@@ -32,14 +23,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run offline pipeline test (safety check ก่อนส่งจริง)
+      - name: Run offline pipeline test
         run: python test_pipeline_offline.py
 
       - name: Run bot once
         env:
-          # ตั้งค่า Secret เหล่านี้ใน GitHub repo:
-          # Settings -> Secrets and variables -> Actions -> New repository secret
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python run_once.py
-'@ | Set-Content -Path .github\workflows\forex-radar.yml -Encoding UTF8
